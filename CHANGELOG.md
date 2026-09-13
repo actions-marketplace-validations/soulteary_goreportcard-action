@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-13
+
+### Security
+- Pinned `actions/setup-go` in `action.yml` to a commit SHA
+  (`b7ad1dad31e06c5925ef5d2fc7ad053ef454303e`, v7.0.0). This was the only
+  `uses:` reference in the repository that executes on a *consumer's* runner
+  rather than our own, and the only one still on a floating tag — which
+  contradicted the guarantee already given in `SECURITY.md`. Consumers run the
+  same `setup-go` code as before; it can no longer change without a commit here.
+
+### Changed
+- Narrowed the release workflow's tag trigger from `v*` to
+  `v[0-9]+.[0-9]+.[0-9]+`. `v*` also matched the floating `v1` / `v1.0`
+  aliases, so every manual move of an alias re-fired the full five-platform
+  build, SBOM, signing and attestation run, and then called
+  `gh release create` against the alias itself. Real releases are unaffected;
+  prereleases such as `v1.2.0-rc.1` now require an explicit channel.
+- Bumped `anchore/sbom-action` via the grouped `github-actions` Dependabot
+  update.
+
 ## [1.1.0] - 2026-08-25
 
 ### Added
@@ -46,5 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that would have failed CI.
 - Cleaned up stale `.github/FUNDING.yml` placeholder entries.
 
-[Unreleased]: https://github.com/soulteary/goreportcard-action/compare/v1.1.0...main
+[Unreleased]: https://github.com/soulteary/goreportcard-action/compare/v1.1.1...main
+[1.1.1]: https://github.com/soulteary/goreportcard-action/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/soulteary/goreportcard-action/compare/v1.0.0...v1.1.0
