@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-13
+
+### Fixed
+- Release signing has never worked. `sigstore/cosign-installer` v4.1.2 installs
+  cosign v3.0.6 by default, and cosign v3 defaults to the new bundle format,
+  under which `--output-signature` and `--output-certificate` are ignored. With
+  no `--bundle` path given, signing failed with
+  `create bundle file: open : no such file or directory`, `set -e` stopped the
+  job, and the steps that upload the archives never ran — which is why neither
+  v1.1.0 nor v1.1.1 carries a single release archive or checksum. Signing now
+  writes `<artifact>.cosign.bundle`, which carries both the signature and the
+  certificate.
+- Made the cosign version explicit via `cosign-release`. It is set to the
+  installer's current default, so the binary we run is unchanged; the point is
+  that a future installer bump can no longer move cosign without the diff
+  saying so. The installer action was pinned by SHA while the version of the
+  tool it installs was left implicit.
+- Made the publish step idempotent. Creating a Release through the UI or
+  `gh release create` also creates the tag that triggers this workflow, so the
+  Release is often already present by the time the workflow reaches it and a
+  bare `gh release create` failed with "already exists". It now uploads to an
+  existing Release instead.
+
+### Changed
+- `SECURITY.md`'s verification command now uses `--bundle` instead of
+  `--certificate` / `--signature`, matching what the release actually ships.
+  The previous command could never have worked: no release has ever carried a
+  `.sig` or `.pem` file.
+
 ## [1.1.1] - 2026-09-13
 
 ### Security
@@ -66,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that would have failed CI.
 - Cleaned up stale `.github/FUNDING.yml` placeholder entries.
 
-[Unreleased]: https://github.com/soulteary/goreportcard-action/compare/v1.1.1...main
+[Unreleased]: https://github.com/soulteary/goreportcard-action/compare/v1.1.2...main
+[1.1.2]: https://github.com/soulteary/goreportcard-action/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/soulteary/goreportcard-action/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/soulteary/goreportcard-action/compare/v1.0.0...v1.1.0

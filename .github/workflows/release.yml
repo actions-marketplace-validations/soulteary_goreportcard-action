@@ -41,6 +41,12 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Make the cosign version explicit. This is the installer's own
+          # current default, so it does not change which binary we run today —
+          # it stops a future installer bump from moving cosign underneath us
+          # without the diff saying so.
+          cosign-release: v3.0.6
 
       - name: Resolve version
         id: version
@@ -76,9 +82,10 @@ jobs:
           for f in *.tar.gz *.zip checksums.txt *_sbom.cdx.json; do
             [ -e "$f" ] || continue
             echo "signing $f"
+            # --output-signature/--output-certificate are deprecated and are
+            # ignored under the new bundle format; the bundle carries both.
             cosign sign-blob --yes \
-              --output-signature "${f}.sig" \
-              --output-certificate "${f}.pem" \
+              --bundle "${f}.cosign.bundle" \
               "$f"
           done
 
@@ -97,6 +104,15 @@ jobs:
         run: |
           set -euo pipefail
           v="${{ steps.version.outputs.value }}"
-          gh release create "$v" dist/* \
-            --title "$v" \
-            --generate-notes
+          # Creating a Release through the UI or `gh release create` also
+          # creates the tag, which is what triggers this workflow — so the
+          # Release frequently already exists by the time we get here, and a
+          # bare `gh release create` would fail with "already exists".
+          if gh release view "$v" >/dev/null 2>&1; then
+            echo "release $v already exists; uploading assets"
+            gh release upload "$v" dist/* --clobber
+          else
+            gh release create "$v" dist/* \
+              --title "$v" \
+              --generate-notes
+          fi
