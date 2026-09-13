@@ -8,7 +8,10 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      # Three-segment releases only. "v*" also matched the floating aliases
+      # (v1, v1.0), so moving an alias re-fired this workflow and attempted
+      # `gh release create v1` with a full cross-platform build.
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       version:
