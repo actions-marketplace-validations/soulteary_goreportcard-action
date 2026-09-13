@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that a future installer bump can no longer move cosign without the diff
   saying so. The installer action was pinned by SHA while the version of the
   tool it installs was left implicit.
+- The Markdown report embedded a generated-at timestamp, so it was never
+  byte-identical between runs. That defeated the "unchanged, skip the commit"
+  guard in `commit-badge.sh`: every push to a consumer's default branch produced
+  a one-line diff and a write-back commit, even when the grade and every metric
+  were identical. In this repository 18 of the last 100 commits on `main` were
+  such no-op badge commits, and the badge SVG itself never changed once. The
+  footer keeps its attribution link but no longer carries a date, and a test
+  asserts the report stays byte-identical across runs.
 - Made the publish step idempotent. Creating a Release through the UI or
   `gh release create` also creates the tag that triggers this workflow, so the
   Release is often already present by the time the workflow reaches it and a
