@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Narrowed the release workflow's tag trigger from `v*` to
   `v[0-9]+.[0-9]+.[0-9]+`. `v*` also matched the floating `v1` / `v1.0`
-  aliases, so every manual move of an alias re-fired the full six-platform
+  aliases, so every manual move of an alias re-fired the full five-platform
   build, SBOM, signing and attestation run, and then called
   `gh release create` against the alias itself. Real releases are unaffected;
   prereleases such as `v1.2.0-rc.1` now require an explicit channel.
