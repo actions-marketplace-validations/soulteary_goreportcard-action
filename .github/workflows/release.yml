@@ -18,6 +18,11 @@ on:
         description: "Version to build (e.g. v1.2.3). Used for archive names."
         required: true
         default: "v0.0.0-manual"
+      publish:
+        description: "Upload the built artifacts to the Release for `version`. The tag must already exist. Use this to recover a tag-push run that failed or never started."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,6 +37,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A recovery publish must build from the released commit, not from
+          # whatever main happens to be. Build-only dispatches keep the default.
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish) && inputs.version || github.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -97,13 +106,27 @@ jobs:
             dist/*.zip
 
       - name: Publish GitHub Release
-        if: github.event_name == 'push'
+        # Also reachable from a manual run with publish=true, so a tag-push run
+        # that failed or never started can be recovered without deleting and
+        # re-pushing an already-released tag.
+        if: github.event_name == 'push' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           v="${{ steps.version.outputs.value }}"
+
+          # A manual publish must name a tag that already exists, otherwise a
+          # dispatch left on the placeholder version would publish a release
+          # for a version nobody ever tagged.
+          if [ "${{ github.event_name }}" != "push" ]; then
+            if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${v}" >/dev/null 2>&1; then
+              echo "::error::tag ${v} does not exist; a manual publish requires an existing tag"
+              exit 1
+            fi
+            echo "manual publish for existing tag ${v}"
+          fi
           # Creating a Release through the UI or `gh release create` also
           # creates the tag, which is what triggers this workflow — so the
           # Release frequently already exists by the time we get here, and a

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The release workflow can now publish from a manual run (`workflow_dispatch`
+  with `publish: true`). Previously the publish step was gated on
+  `github.event_name == 'push'`, so a manual run built, signed and attested the
+  archives and then discarded them — there was no way to recover a tag-push run
+  that failed or never started, short of deleting and re-pushing an already
+  released tag. A manual publish refuses a `version` that is not an existing
+  tag, and checks out that tag rather than `main`, so the archives are built
+  from the released commit.
+
 ## [1.1.2] - 2026-09-13
 
 ### Fixed
