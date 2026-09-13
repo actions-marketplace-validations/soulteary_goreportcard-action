@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The release workflow can now publish from a manual run (`workflow_dispatch`
+  with `publish: true`). Previously the publish step was gated on
+  `github.event_name == 'push'`, so a manual run built, signed and attested the
+  archives and then discarded them — there was no way to recover a tag-push run
+  that failed or never started, short of deleting and re-pushing an already
+  released tag. A manual publish refuses a `version` that is not an existing
+  tag, and checks out that tag rather than `main`, so the archives are built
+  from the released commit.
+
+  Build provenance is skipped when a recovery run's built tree is not
+  `GITHUB_SHA`. `actions/attest-build-provenance` takes the source commit for
+  its SLSA predicate from the event context and has no input to override it, so
+  a recovery dispatched from `main` for an older tag would attest a commit the
+  archives were not built from; a wrong source claim is worse than none. The run
+  logs a warning saying so. Dispatching the recovery from the tag itself keeps
+  the context and the tree in agreement and the attestation is emitted as usual
+  — that is the preferred path for any tag whose `release.yml` already carries
+  the `publish` input. Tag-push releases are unaffected and always attested.
+  `checksums.txt`, the SBOM and the cosign bundles are computed over the actual
+  bytes and are emitted either way.
+
 ## [1.1.2] - 2026-09-13
 
 ### Fixed

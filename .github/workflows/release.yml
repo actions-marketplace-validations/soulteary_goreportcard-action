@@ -18,6 +18,11 @@ on:
         description: "Version to build (e.g. v1.2.3). Used for archive names."
         required: true
         default: "v0.0.0-manual"
+      publish:
+        description: "Upload the built artifacts to the Release for `version`. The tag must already exist. Use this to recover a tag-push run that failed or never started."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,6 +37,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A recovery publish must build from the released commit, not from
+          # whatever main happens to be. Build-only dispatches keep the default.
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish) && inputs.version || github.ref }}
+
+      # actions/attest-build-provenance takes the source commit for its SLSA
+      # predicate from the event context (GITHUB_SHA / GITHUB_REF); it has no
+      # input to override them and never looks at the working tree. The `ref:`
+      # above moves the tree without moving the context, so a recovery run
+      # dispatched from main for an older tag would attest a commit the
+      # archives were not built from.
+      - name: Check the built tree against the provenance context
+        id: buildref
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          echo "built tree:      $head"
+          echo "event context:   $GITHUB_SHA"
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "attestable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "attestable=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Built $head but the event context is $GITHUB_SHA, so build provenance would name the wrong source commit; skipping it. Dispatch the recovery from the tag itself to get provenance."
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -90,6 +120,11 @@ jobs:
           done
 
       - name: Attest build provenance for archives
+        # Skipped when the built tree is not GITHUB_SHA (see above): provenance
+        # naming a commit the artifacts did not come from is worse than none.
+        # checksums.txt, the SBOM and the cosign bundles are computed over the
+        # actual bytes and are unaffected either way.
+        if: steps.buildref.outputs.attestable == 'true'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
@@ -97,13 +132,27 @@ jobs:
             dist/*.zip
 
       - name: Publish GitHub Release
-        if: github.event_name == 'push'
+        # Also reachable from a manual run with publish=true, so a tag-push run
+        # that failed or never started can be recovered without deleting and
+        # re-pushing an already-released tag.
+        if: github.event_name == 'push' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           v="${{ steps.version.outputs.value }}"
+
+          # A manual publish must name a tag that already exists, otherwise a
+          # dispatch left on the placeholder version would publish a release
+          # for a version nobody ever tagged.
+          if [ "${{ github.event_name }}" != "push" ]; then
+            if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${v}" >/dev/null 2>&1; then
+              echo "::error::tag ${v} does not exist; a manual publish requires an existing tag"
+              exit 1
+            fi
+            echo "manual publish for existing tag ${v}"
+          fi
           # Creating a Release through the UI or `gh release create` also
           # creates the tag, which is what triggers this workflow — so the
           # Release frequently already exists by the time we get here, and a
