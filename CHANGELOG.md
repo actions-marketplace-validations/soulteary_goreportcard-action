@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tag, and checks out that tag rather than `main`, so the archives are built
   from the released commit.
 
+  Build provenance is skipped when a recovery run's built tree is not
+  `GITHUB_SHA`. `actions/attest-build-provenance` takes the source commit for
+  its SLSA predicate from the event context and has no input to override it, so
+  a recovery dispatched from `main` for an older tag would attest a commit the
+  archives were not built from; a wrong source claim is worse than none. The run
+  logs a warning saying so. Dispatching the recovery from the tag itself keeps
+  the context and the tree in agreement and the attestation is emitted as usual
+  — that is the preferred path for any tag whose `release.yml` already carries
+  the `publish` input. Tag-push releases are unaffected and always attested.
+  `checksums.txt`, the SBOM and the cosign bundles are computed over the actual
+  bytes and are emitted either way.
+
 ## [1.1.2] - 2026-09-13
 
 ### Fixed

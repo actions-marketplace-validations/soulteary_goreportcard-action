@@ -42,6 +42,27 @@ jobs:
           # whatever main happens to be. Build-only dispatches keep the default.
           ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish) && inputs.version || github.ref }}
 
+      # actions/attest-build-provenance takes the source commit for its SLSA
+      # predicate from the event context (GITHUB_SHA / GITHUB_REF); it has no
+      # input to override them and never looks at the working tree. The `ref:`
+      # above moves the tree without moving the context, so a recovery run
+      # dispatched from main for an older tag would attest a commit the
+      # archives were not built from.
+      - name: Check the built tree against the provenance context
+        id: buildref
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          echo "built tree:      $head"
+          echo "event context:   $GITHUB_SHA"
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "attestable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "attestable=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Built $head but the event context is $GITHUB_SHA, so build provenance would name the wrong source commit; skipping it. Dispatch the recovery from the tag itself to get provenance."
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -99,6 +120,11 @@ jobs:
           done
 
       - name: Attest build provenance for archives
+        # Skipped when the built tree is not GITHUB_SHA (see above): provenance
+        # naming a commit the artifacts did not come from is worse than none.
+        # checksums.txt, the SBOM and the cosign bundles are computed over the
+        # actual bytes and are unaffected either way.
+        if: steps.buildref.outputs.attestable == 'true'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
