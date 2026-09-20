@@ -35,8 +35,7 @@ repository. Its trust boundary is small and auditable:
 
   ```bash
   cosign verify-blob \
-    --certificate goreportcard_<version>_<os>_<arch>.tar.gz.pem \
-    --signature  goreportcard_<version>_<os>_<arch>.tar.gz.sig \
+    --bundle goreportcard_<version>_<os>_<arch>.tar.gz.cosign.bundle \
     --certificate-identity-regexp 'https://github.com/soulteary/goreportcard-action/.+' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
     goreportcard_<version>_<os>_<arch>.tar.gz

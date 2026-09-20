@@ -1,6 +1,7 @@
 package check
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -139,6 +140,35 @@ func TestGenerateReportMarkdown(t *testing.T) {
 		if !strings.Contains(md, want) {
 			t.Errorf("report missing %q\n%s", want, md)
 		}
+	}
+}
+
+// TestGenerateReportMarkdownIsDeterministic guards the reason the report must
+// not carry a generated-at timestamp: the report is committed back into the
+// consumer's repository, and commit-badge.sh skips the commit when nothing
+// changed. Any per-run value here defeats that guard, so every run produces a
+// one-line diff and a push — which is how an unrelated GitHub push failure
+// surfaced as a red badge workflow on an unchanged A+ grade.
+func TestGenerateReportMarkdownIsDeterministic(t *testing.T) {
+	result := ChecksResult{
+		Average: 1,
+		Grade:   GradeAPlus,
+		Files:   16,
+		Checks: []Score{
+			{Name: "gofmt", Percentage: 1},
+			{Name: "go_vet", Percentage: 1},
+		},
+	}
+
+	first := GenerateReportMarkdown(result)
+	second := GenerateReportMarkdown(result)
+	if first != second {
+		t.Errorf("report is not deterministic for identical input:\n--- first ---\n%s\n--- second ---\n%s", first, second)
+	}
+
+	// A date would be the easy thing to reintroduce, so assert on it directly.
+	if regexp.MustCompile(`\d{4}-\d{2}-\d{2}`).MatchString(first) {
+		t.Errorf("report contains a date; it must stay byte-identical across runs:\n%s", first)
 	}
 }
 
